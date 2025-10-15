@@ -4,7 +4,7 @@ import { useState } from "react";
 
 export default function AssetRow({ asset }) {
   const [isOpen, setIsOpen] = useState(false);
-
+  console.log(asset);
   return (
     <>
       <div
@@ -18,7 +18,7 @@ export default function AssetRow({ asset }) {
           onClick={() => setIsOpen(true)}
         >
           <img
-            src={asset.foto_url || "/placeholder.png"}
+            src={asset.img_url || "/placeholder.png"}
             alt={asset.nome || asset.descrizione}
             className="w-full h-full object-cover rounded-lg transition-transform duration-300 hover:scale-105"
           />
