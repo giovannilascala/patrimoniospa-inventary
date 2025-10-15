@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+
+html {
+  font-size: 62.5%;
+  /* 1rem = 10px */
+  background-color: #f1f1f1;
+}
