@@ -10,7 +10,7 @@ export default function AggiungiBenePage({ theme, setTheme }) {
   const [valore, setValore] = useState("");
   const [stanza, setStanza] = useState("");
   const [dipartimento, setDipartimento] = useState("");
-  const [sede, setSede] = useState("");
+  const [sede, setSede] = useState("Palazzo Zanca");
   const [caricamento, setCaricamento] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -134,7 +134,6 @@ export default function AggiungiBenePage({ theme, setTheme }) {
               id="dipartimento"
               value={dipartimento}
               onChange={(e) => setDipartimento(e.target.value)}
-              required
               placeholder="Inserisci il dipartimento di appartenenza..."
               className="p-4 rounded-2xl border-2 border-gray-300 dark:border-gray-600
                 bg-gray-50 dark:bg-gray-800 focus:bg-white dark:focus:bg-gray-700
