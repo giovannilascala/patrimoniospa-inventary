@@ -7,49 +7,55 @@ import { supabase } from "@/lib/supabaseClient";
 export default function AssetTable() {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stanze, setStanze] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [filters, setFilters] = useState({
+    stanza: "",
+    dipartimento: "",
+    sede: "",
+  });
+  const [options, setOptions] = useState({
+    stanze: [],
+    dipartimenti: [],
+    sedi: [],
+  });
 
-  const currentStanza = stanze[currentIndex] || "corridoio";
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
+  // 🔹 Recupera tutte le opzioni uniche per filtri
   useEffect(() => {
-    const fetchStanze = async () => {
+    const fetchOptions = async () => {
       try {
-        const { data, error } = await supabase
-          .from("beni_mobili")
-          .select("stanza")
-          .order("stanza", { ascending: true });
-
+        const { data, error } = await supabase.from("beni_mobili").select("stanza, dipartimento, sede");
         if (error) throw error;
 
-        const uniqueStanze = Array.from(new Set(data.map((d) => d.stanza)));
-        if (uniqueStanze.includes("corridoio")) {
-          uniqueStanze.splice(uniqueStanze.indexOf("corridoio"), 1);
-          uniqueStanze.unshift("corridoio");
-        }
+        const stanze = [...new Set(data.map((d) => d.stanza).filter(Boolean))];
+        const dipartimenti = [...new Set(data.map((d) => d.dipartimento).filter(Boolean))];
+        const sedi = [...new Set(data.map((d) => d.sede).filter(Boolean))];
 
-        setStanze(uniqueStanze);
+        setOptions({ stanze, dipartimenti, sedi });
       } catch (err) {
-        console.error("Errore nel caricamento delle stanze:", err.message);
+        console.error("Errore nel caricamento delle opzioni:", err.message);
       }
     };
 
-    fetchStanze();
+    fetchOptions();
   }, []);
 
+  // 🔹 Caricamento beni filtrati
   useEffect(() => {
     const fetchAssets = async () => {
-      if (!currentStanza) return;
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("beni_mobili")
-          .select("*")
-          .eq("stanza", currentStanza)
-          .order("id", { ascending: true });
+        let query = supabase.from("beni_mobili").select("*").order("id", { ascending: true });
 
+        if (filters.stanza) query = query.eq("stanza", filters.stanza);
+        if (filters.dipartimento) query = query.eq("dipartimento", filters.dipartimento);
+        if (filters.sede) query = query.eq("sede", filters.sede);
+
+        const { data, error } = await query;
         if (error) throw error;
         setAssets(data || []);
+        setCurrentPage(1); // reset pagina ogni volta che cambia un filtro
       } catch (err) {
         console.error("Errore nel caricamento dei beni:", err.message);
       } finally {
@@ -58,87 +64,115 @@ export default function AssetTable() {
     };
 
     fetchAssets();
-  }, [currentStanza]);
+  }, [filters]);
 
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev + 1 < stanze.length ? prev + 1 : prev));
-  };
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev - 1 >= 0 ? prev - 1 : prev));
-  };
-  const handleSelectChange = (e) => {
-    const stanzaSelezionata = e.target.value;
-    const index = stanze.findIndex((s) => s === stanzaSelezionata);
-    if (index >= 0) setCurrentIndex(index);
+  // 🔹 Gestione paginazione
+  const indexOfLast = currentPage * itemsPerPage;
+  const indexOfFirst = indexOfLast - itemsPerPage;
+  const currentAssets = assets.slice(indexOfFirst, indexOfLast);
+  const totalPages = Math.ceil(assets.length / itemsPerPage);
+
+  // 🔹 Gestione cambi filtro
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-8 mr-40 ml-40 transition-colors duration-300 bg-gray-100 dark:bg-gray-900">
+    <div className="flex flex-col items-center justify-center min-h-screen px-8 md:mx-40 transition-colors duration-300 bg-gray-100 dark:bg-gray-900">
       <div className="w-full">
 
-        {/* Titolo spostato più in basso */}
-        <h2 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-gray-100 text-center mt-20 mb-16">
-          Patrimonio Mobile – {currentStanza.charAt(0).toUpperCase() + currentStanza.slice(1)}
-        </h2>
+        {/* 🔹 Filtri */}
+        <div className="flex flex-wrap justify-center gap-4 mb-12 py-6">
+          <select
+            name="stanza"
+            value={filters.stanza}
+            onChange={handleFilterChange}
+            className="px-6 py-3 rounded-lg border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-800 text-xl font-medium text-gray-800 dark:text-gray-100"
+          >
+            <option value="">Tutte le stanze</option>
+            {options.stanze.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
 
-        {/* Intestazioni con stessa griglia delle righe */}
-        <div className="grid grid-cols-[180px_6fr_5fr_2fr_3fr] 
-                        bg-green-100 dark:bg-green-900/50 
-                        text-gray-900 dark:text-gray-100 
-                        font-semibold text-2xl py-6 px-10 
-                        rounded-3xl mb-8 shadow-md transition-colors duration-300">
-          <span></span>
-          <span className="text-left pl-6">Descrizione</span>
-          <span className="text-left pl-6">Note</span>
-          <span className="text-center">Quantità</span>
-          <span className="text-center">Valore (€)</span>
+          <select
+            name="dipartimento"
+            value={filters.dipartimento}
+            onChange={handleFilterChange}
+            className="px-6 py-3 rounded-lg border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-800 text-xl font-medium text-gray-800 dark:text-gray-100"
+          >
+            <option value="">Tutti i dipartimenti</option>
+            {options.dipartimenti.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+
+          <select
+            name="sede"
+            value={filters.sede}
+            onChange={handleFilterChange}
+            className="px-6 py-3 rounded-lg border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-800 text-xl font-medium text-gray-800 dark:text-gray-100"
+          >
+            <option value="">Tutte le sedi</option>
+            {options.sedi.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </div>
 
+        {/* 🔹 Intestazione */}
+        <div className="grid grid-cols-[140px_3fr_3fr_2fr_2fr_2fr_2fr] 
+                        bg-green-100 dark:bg-green-900/50 
+                        text-gray-900 dark:text-gray-100 
+                        font-semibold text-xl md:text-2xl py-6 px-10 
+                        rounded-3xl mb-8 shadow-md transition-colors duration-300">
+          <span></span>
+          <span className="text-left">Descrizione</span>
+          <span className="text-left">Note</span>
+          <span className="text-center">Quantità</span>
+          <span className="text-center">Valore (€)</span>
+          <span className="text-center">Sede</span>
+          <span className="text-center">QR</span>
+        </div>
+
+        {/* 🔹 Righe */}
         {loading ? (
-          <p className="text-center text-2xl text-gray-500 dark:text-gray-400">
-            Caricamento in corso...
-          </p>
-        ) : assets.length > 0 ? (
-          assets.map((asset) => <AssetRow key={asset.id} asset={asset} />)
+          <p className="text-center text-2xl text-gray-500 dark:text-gray-400">Caricamento...</p>
+        ) : currentAssets.length > 0 ? (
+          currentAssets.map((asset) => <AssetRow key={asset.id} asset={asset} />)
         ) : (
           <p className="text-center text-2xl text-gray-500 dark:text-gray-400">
-            Nessun bene trovato in questa stanza.
+                Nessun bene trovato.
           </p>
         )}
       </div>
 
-      {/* Navigazione stanze */}
-      <div className="flex justify-center mb-12 gap-4 mt-8">
+      {/* 🔹 Paginazione */}
+      <div className="flex justify-center mt-12 gap-4 mb-16">
         <button
-          onClick={handlePrev}
-          disabled={currentIndex === 0}
+          onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          disabled={currentPage === 1}
           className="px-6 py-3 bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 
-                     text-gray-900 dark:text-gray-100 rounded-lg text-xl font-semibold disabled:opacity-50 transition-colors duration-300"
+                     text-gray-900 dark:text-gray-100 rounded-lg text-xl font-semibold disabled:opacity-50"
         >
-          &larr; Stanza precedente
+          ← Precedente
         </button>
 
-        <select
-          value={currentStanza}
-          onChange={handleSelectChange}
-          className="px-6 py-3 rounded-lg border border-gray-400 dark:border-gray-600 
-                     text-xl font-medium bg-white dark:bg-gray-800 
-                     text-gray-800 dark:text-gray-100 transition-colors duration-300"
-        >
-          {stanze.map((stanza) => (
-            <option key={stanza} value={stanza}>
-              {stanza.charAt(0).toUpperCase() + stanza.slice(1)}
-            </option>
-          ))}
-        </select>
+        <span className="text-gray-700 dark:text-gray-300 text-xl font-medium my-auto">
+          Pagina {currentPage} di {totalPages}
+        </span>
 
         <button
-          onClick={handleNext}
-          disabled={currentIndex === stanze.length - 1}
+          onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+          disabled={currentPage === totalPages}
           className="px-6 py-3 bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 
-                     text-gray-900 dark:text-gray-100 rounded-lg text-xl font-semibold disabled:opacity-50 transition-colors duration-300"
+                     text-gray-900 dark:text-gray-100 rounded-lg text-xl font-semibold disabled:opacity-50"
         >
-          Stanza successiva &rarr;
+          Successiva →
         </button>
       </div>
     </div>
